@@ -127,16 +127,12 @@ def predict(model, X_test):
     y_pred = model.predict(X_test)
     return y_pred
 
-def evaluate_model(y_test, y_pred):
+def evaluate_model(X, y_test, y_pred):
     # Evaluating model performance
-    # mse = mean_squared_error(y_test, y_pred)
-    # print("Mean Squared Error:", mse)
     mae_score = mean_absolute_error(y_test, y_pred)
     rmse_score = mean_squared_error(y_test, y_pred, squared=False)
     r2_score_ = r2_score(y_test, y_pred)
-    # r2adj = mastml.metrics.r2_score_adjusted(y_test, y_pred, n_features=len(good_list))
-    r2adj_score = (1 - (1-r2_score_)*(len(y_test)-1)/(len(y_test)-len(y_test.columns)-1))
-    
+    r2adj_score = 1 - (1 - r2_score_) * (X.shape[0] - 1) / (X.shape[0] - X.shape[1] - 1)
     return mae_score, rmse_score, r2_score_, r2adj_score
     
 def metricsPrint(test_df, pred_df):
