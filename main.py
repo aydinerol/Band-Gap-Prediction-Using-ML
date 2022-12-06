@@ -18,12 +18,17 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_square
 
 seed = 0
 
-def import_dataset():
+def import_dataset(path='', hasGeneratedFeatures = False):
     # Importing dataset
-    data = pd.read_csv("data/citrination-export.csv")
-    data = clean_dataset(data)
+    if not hasGeneratedFeatures:
+        data = pd.read_csv("data/citrination-export.csv")
     
-    X = data[["Chemical formula"]]
+    if hasGeneratedFeatures:
+        data = pd.read_csv(path+'/AllData-Citrination-CDMM'+'.csv')
+    
+    data = clean_dataset(data)
+
+    X = data.drop(columns=["Chemical formula","Band gap"])
     y = data["Band gap"]
     return X, y
 
@@ -167,7 +172,7 @@ def main():
     X, y = import_dataset()
 
     # Generating additional features using MAST-ML
-    X,y = generate_features(X)
+    # X,y = generate_features(X)
 
     # Find and select optimal features
     # X = FeatureSelectionPipeline().find_features(X, y)
@@ -196,8 +201,8 @@ if __name__ == "__main__":
 # class FeatureSelectionPipeline:
 
 
-random_forest_reg = RandomForestRegressor(random_state=seed, criterion='mse', n_estimators=500, bootstrap=True)
-test_fraction = 0.15
+# random_forest_reg = RandomForestRegressor(random_state=seed, criterion='mse', n_estimators=500, bootstrap=True)
+# test_fraction = 0.15
 #preprocessor = SklearnPreprocessor(preprocessor='StandardScaler', as_frame=True)
 
 def manageCorrelation(feat_data):
@@ -225,8 +230,6 @@ def shuffleList(featureList, randomize=True):
     else:
         random.seed(seed)
     return random.sample(list(featureList), len(featureList))
-
-
 
 def test_feature(feature, scores, good_features_list, mae_score, rmse_score, r2_score, r2adj_score):
     
@@ -320,12 +323,13 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
         
         # Train model
         model = train_model(X_train, y_train, "RF")
-        model.fit(X_train, y_train)
+        model = model.fit(X_train, y_train)
         
         # Get prediction
         y_pred = model.predict()
 
         scores = evaluate_model(y_test, y_pred)
-        test_feature(feature, scores, good_features_list, mae_score, rmse_score, r2_score, r2adj_score)
+        scores, good_features_list = test_feature(feature, scores, good_features_list, mae_score, rmse_score, r2_score, r2adj_score)
 
+    return good_features_list
 
