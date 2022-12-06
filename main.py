@@ -62,8 +62,13 @@ def generate_features(X, y):
 
     return X, y
 
+def scale_dataset(X):
+    columns = X.columns
+    X = StandardScaler().fit_transform(X)
+    X = pd.DataFrame(X, columns=columns)
+    return X
 
-def split_dataset(X, y, evaluation_method='cross_validation', test_fraction=0.2, n_splits=5):
+def split_dataset(X, y, evaluation_method='train_test_split', test_fraction=0.15, n_splits=5):
     """Split a dataset for evaluating a model.
     
     This function splits a dataset into train and test sets, or performs
@@ -108,15 +113,12 @@ def train_model(X_train, y_train, model_type):
         #SVC.fit(X_train, y_train)
     
     elif model_type == "Random Forest" or model_type == "RF":
-        regressor = RandomForestRegressor(n_estimators=500)
+        regressor = RandomForestRegressor(n_estimators=100)
 
     else:
         raise ValueError(f"Invalid model type: {model_type}")
-    model = Pipeline([
-        ('scaler', StandardScaler()),
-        ('regressor', regressor())
-        ])
-    return model
+
+    return regressor.fit(X_train,y_train)
         
 
 # Predict the response for test dataset
@@ -213,9 +215,15 @@ def manageCorrelation(feat_data):
     features_df_filt_lowcorr = feat_data.drop(to_drop, axis=1) # drop highly-correlated features
     return features_df_filt_lowcorr
 
+def scale_dataset(X):
+    columns = X.columns
+    X = StandardScaler().fit_transform(X)
+    X = pd.DataFrame(X, columns=columns)
+    return X
 
 def pull_features(X, y, n_best_features=3):
     # Pick n_best_features number of features quickly
+    X = scale_dataset(X)
     random_forest_regressor = train_model(X, y, "RF")
     feat_importances = pd.Series(random_forest_regressor.feature_importances_, index=X.columns)
     initial_feature_list = list(feat_importances.nlargest(n_best_features).keys())
@@ -299,11 +307,14 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
     X_train, X_test, y_train, y_test = split_dataset(X, y)
     
     model = train_model(X, y, "RF")
+
+    model.fit(X_test, y_test)
     
-    y_pred = model.fit(X_test, y_test)
+    y_pred = predict(model, X_test)
     
     mae_score, rmse_score, r2_score, r2adj_score = evaluate_model(y_test, y_pred)
     
+    # Save scores in scores dictionary
     scores = evaluate_model(scores, mae_score, rmse_score, r2_score, r2adj_score)
     
     ### Automation Part
@@ -318,8 +329,9 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
         
         # Calculate and eliminate highly-correlated features
         X = manageCorrelation(X)
+        
         # Preprocess
-        # X = StandardScaler(X)
+        X = scale_dataset(X)
         
         # Train model
         model = train_model(X_train, y_train, "RF")
