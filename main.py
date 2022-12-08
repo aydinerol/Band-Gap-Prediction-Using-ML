@@ -235,7 +235,12 @@ def shuffleList(featureList, randomize=True):
         random.seed(seed)
     return random.sample(list(featureList), len(featureList))
 
-def test_feature(feature, scores, good_features_list, mae_score, rmse_score, r2_score, r2adj_score):
+def test_feature(feature, scores, good_features_list):
+    
+    mae_score = scores['mae']
+    rmse_score = scores['rmse']
+    r2_score = scores['r2']
+    r2adj_score = scores['r2adj']
     
     # Check if the scores are the best results
     if scores['r2adj'] < max(scores['r2adj']) or scores['r2'] < max(scores['r2']) or scores['mae'] > max(scores['mae']) or scores['rmse'] > max(scores['rmse']):
@@ -247,25 +252,21 @@ def test_feature(feature, scores, good_features_list, mae_score, rmse_score, r2_
     if feature in good_features_list:
       print('New score: '+"%.3f"%scores['r2adj']+'/'+"%.3f"%scores['r2']+' :: - MAE: '+"%.3f"%scores['mae']+' - RMSE: '+"%.3f"%scores['rmse']+', Adding: '+good_features_list[-1])
         
-    # update_scores(mae_score, rmse_score, r2_score, r2adj_score)
     # Update the scores in the dictionary
-    scores['mae'].append(mae_score)
-    scores['rmse'].append(rmse_score)
-    scores['r2'].append(r2_score)
-    scores['r2adj'].append(r2adj_score)
+    scores = update_scores(scores, mae_score, rmse_score, r2_score, r2adj_score)
     
     return scores, good_features_list
     
 
 # def get_scores(r2adj_list, r2_list, mae_list, rmse_list ):
 
-# def update_scores(scores, mae_score, rmse_score, r2_score, r2adj_score):
-#     # Update the scores in the dictionary
-#     scores['mae'].append(mae_score)
-#     scores['rmse'].append(rmse_score)
-#     scores['r2'].append(r2_score)
-#     scores['r2adj'].append(r2adj_score)    
-
+def update_scores(scores, mae_score, rmse_score, r2_score, r2adj_score):
+    # Update the scores in the scores dictionary
+    scores['mae'].append(mae_score)
+    scores['rmse'].append(rmse_score)
+    scores['r2'].append(r2_score)
+    scores['r2adj'].append(r2adj_score)    
+    return scores
 
 
 # feature = "AtomicBla"
@@ -279,6 +280,7 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
       'r2adj': []
     }
     
+    Xcopy = X.copy()
     # when no feature list is specified, 
     # change n_best_features to specify the number of features will be selected by the if-block below
     
@@ -287,57 +289,51 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
         good_features_list = pull_features(X, y, n_best_features=3)
 
     X = pd.DataFrame(X, columns=good_features_list)
-
-    # pipeline= 
-    # feature_selector_pipeline = Pipeline([
-    #     ('correlation', manageCorrelation()),
-    #     ('training',  train_model(X, y, "RF")),
-    #     ('prediction', predict()),
-    #     ('evaluation', test_feature())]) 
-    
-    # y_pred = feature_selector_pipeline.fit(feature_selector_pipeline.manageCorrelation(),y)
-    
-    #num_obs = len(X_test)
-    #r2adj = 1-(1-r2_score)*(num_obs-1)/(num_obs-len(good_list_)-1)
     
     X_train, X_test, y_train, y_test = split_dataset(X, y)
     
     model = train_model(X, y, "RF")
 
-    model.fit(X_test, y_test)
-    
     y_pred = predict(model, X_test)
     
-    mae_score, rmse_score, r2_score, r2adj_score = evaluate_model(y_test, y_pred)
+    mae_score, rmse_score, r2_score, r2adj_score = evaluate_model(X_train, y_test, y_pred)
+    print(mae_score, rmse_score, r2_score, r2adj_score)
     
     # Save scores in scores dictionary
-    scores = evaluate_model(scores, mae_score, rmse_score, r2_score, r2adj_score)
+    scores = evaluate_model(X_train, y_test, y_pred)
+    
+    print(scores)
     
     ### Automation Part
-    features_2b_tried = X[X.columns.difference(good_features_list)] ## Features to be tested
+    # Create a list of features to be tested in means of MAE, RMSE, R^2, ADJ-R^2
+    features_2b_tried = Xcopy[Xcopy.columns.difference(good_features_list)] ## Features to be tested
     features_2b_tried_list = features_2b_tried.columns
+    
     # Shuffle/randomize features
     shuffled_features = shuffleList(features_2b_tried_list, randomize=randomize) 
-    
+
+    print('Finding features now.')
     for feature in shuffled_features:
+        print('Testing: '+feature)
         good_features_list.append(feature) # Feature to be tested
-        X = pd.DataFrame(X, columns=good_features_list)
+        X = pd.DataFrame(Xcopy, columns=good_features_list)
         
         # Calculate and eliminate highly-correlated features
         X = manageCorrelation(X)
-        
         # Preprocess
         X = scale_dataset(X)
         
+        # Split
+        X_train, X_test, y_train, y_test = split_dataset(X, y)
+        
         # Train model
         model = train_model(X_train, y_train, "RF")
-        model = model.fit(X_train, y_train)
         
         # Get prediction
-        y_pred = model.predict()
+        y_pred = predict(model, X_test)
 
-        scores = evaluate_model(y_test, y_pred)
-        scores, good_features_list = test_feature(feature, scores, good_features_list, mae_score, rmse_score, r2_score, r2adj_score)
+        scores = evaluate_model(X, y_test, y_pred)
+        scores, good_features_list = test_feature(feature, scores, good_features_list)
 
-    return good_features_list
-
+    X = pd.DataFrame(Xcopy, columns=good_features_list)
+    return X
