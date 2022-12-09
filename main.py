@@ -164,44 +164,10 @@ def plot_results(y_test, y_pred):
     plt.title("Actual vs Predicted Band Gap")
     plt.show()
 
-# Main program
-def main():
-    # Importing dataset
-    X, y = import_dataset()
 
-    # Generating additional features using MAST-ML
-    # X,y = generate_features(X)
-
-    # Find and select optimal features
-    # X = FeatureSelectionPipeline().find_features(X, y)
-    X = find_features(X, y)
-    
-    # Splitting dataset into train and test sets
-    X_train, X_test, y_train, y_test = split_dataset(X, y)
-
-    # Train the model using the training sets
-    model = train_model(X_train, y_train, "RF")
-
-    # Predicting using trained model
-    y_pred = predict(model, X_test)
-
-    # Evaluating model performance
-    #evaluate_model(y_test, y_pred)
-    metricsPrint(y_test, y_pred)
-
-    # Plotting actual vs predicted values
-    plot_results(y_test, y_pred)
-
-if __name__ == "__main__":
-    main()
-
-
-# class FeatureSelectionPipeline:
-
-
-# random_forest_reg = RandomForestRegressor(random_state=seed, criterion='mse', n_estimators=500, bootstrap=True)
-# test_fraction = 0.15
-#preprocessor = SklearnPreprocessor(preprocessor='StandardScaler', as_frame=True)
+# =============================================================================
+# AUTOMATED FEATURE SELECTOR CLASS
+# =============================================================================
 
 def manageCorrelation(feat_data):
     # This block is used to find and to drop highly-correlated features in a given feature dataframe 
@@ -223,8 +189,19 @@ def pull_features(X, y, n_best_features=3):
     random_forest_regressor = train_model(X, y, "RF")
     feat_importances = pd.Series(random_forest_regressor.feature_importances_, index=X.columns)
     initial_feature_list = list(feat_importances.nlargest(n_best_features).keys())
-   
+
+    print('Initial features are: '+ initial_feature_list[0]+' ,'+initial_feature_list[1]+' ,'+initial_feature_list[2])
+    
     return initial_feature_list
+
+def update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores):
+    # Update the scores in the scores dictionary
+    scores['mae'].append(mae_score)
+    scores['rmse'].append(rmse_score)
+    scores['r2'].append(r2_score)
+    scores['r2adj'].append(r2adj_score) 
+    
+    return scores
 
 def shuffleList(featureList, randomize=True):
     # Manages the shuffling of a given list
@@ -235,41 +212,47 @@ def shuffleList(featureList, randomize=True):
         random.seed(seed)
     return random.sample(list(featureList), len(featureList))
 
-def test_feature(feature, scores, good_features_list):
+def typeChecker(scores):
+    # Check if the object is an instance of the dict class
+    dict_type = type(scores)
+
+    # Make sure the type of the dictionary is dict
+    if dict_type == dict:
+      # The dictionary is a dict, so we can use it as a dictionary
+      print("The dictionary is a dict")
+    else:
+      # The dictionary is not a dict, so we cannot use it as a dictionary
+      print("The dictionary is not a dict")
+      
+def test_feature(feature, good_features_list, scores):
     
-    mae_score = scores['mae']
-    rmse_score = scores['rmse']
-    r2_score = scores['r2']
-    r2adj_score = scores['r2adj']
+    mae_score = scores['mae'][-1]
+    rmse_score = scores['rmse'][-1]
+    r2_score = scores['r2'][-1]
+    r2adj_score = scores['r2adj'][-1]
+    
+    # mae_score = scores['mae'].pop()
+    # rmse_score = scores['rmse'].pop()
+    # r2_score = scores['r2'].pop()
+    # r2adj_score = scores['r2adj'].pop()
     
     # Check if the scores are the best results
-    if scores['r2adj'] < max(scores['r2adj']) or scores['r2'] < max(scores['r2']) or scores['mae'] > max(scores['mae']) or scores['rmse'] > max(scores['rmse']):
+    if scores['r2adj'][-1] < max(scores['r2adj']) or scores['r2'][-1] < max(scores['r2']) or scores['mae'][-1] > max(scores['mae']) or scores['rmse'][-1] > max(scores['rmse']):
         # Remove the last feature from the list of good features
         good_features_list = good_features_list[:-1]
     
     
     # Check if the feature is in the list of good features
-    if feature in good_features_list:
-      print('New score: '+"%.3f"%scores['r2adj']+'/'+"%.3f"%scores['r2']+' :: - MAE: '+"%.3f"%scores['mae']+' - RMSE: '+"%.3f"%scores['rmse']+', Adding: '+good_features_list[-1])
-        
+    if feature == good_features_list[-1]:
+        #print('New score: '+"%.3f"%scores['r2adj']+'/'+"%.3f"%scores['r2']+' :: - MAE: '+"%.3f"%scores['mae']+' - RMSE: '+"%.3f"%scores['rmse']+', Adding: '+good_features_list[-1])
+        #old version:
+        print('New score: '+"%.3f"%r2adj_score+'/'+"%.3f"%r2_score+' :: - MAE: '+"%.3f"%mae_score+' - RMSE: '+"%.3f"%rmse_score+', Adding: '+feature)
+      
     # Update the scores in the dictionary
-    scores = update_scores(scores, mae_score, rmse_score, r2_score, r2adj_score)
+    scores = update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores)
     
-    return scores, good_features_list
-    
+    return good_features_list, scores
 
-# def get_scores(r2adj_list, r2_list, mae_list, rmse_list ):
-
-def update_scores(scores, mae_score, rmse_score, r2_score, r2adj_score):
-    # Update the scores in the scores dictionary
-    scores['mae'].append(mae_score)
-    scores['rmse'].append(rmse_score)
-    scores['r2'].append(r2_score)
-    scores['r2adj'].append(r2adj_score)    
-    return scores
-
-
-# feature = "AtomicBla"
 randomize=True
 
 def find_features(X, y, good_features_list=[], n_best_features=3):
@@ -279,6 +262,7 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
       'r2': [],
       'r2adj': []
     }
+    print(type(scores))
     
     Xcopy = X.copy()
     # when no feature list is specified, 
@@ -298,10 +282,9 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
     
     mae_score, rmse_score, r2_score, r2adj_score = evaluate_model(X_train, y_test, y_pred)
     print(mae_score, rmse_score, r2_score, r2adj_score)
-    
+
     # Save scores in scores dictionary
-    scores = evaluate_model(X_train, y_test, y_pred)
-    
+    scores = update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores)
     print(scores)
     
     ### Automation Part
@@ -332,8 +315,45 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
         # Get prediction
         y_pred = predict(model, X_test)
 
-        scores = evaluate_model(X, y_test, y_pred)
-        scores, good_features_list = test_feature(feature, scores, good_features_list)
+        #scores = update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores)
+        good_features_list, scores = test_feature(feature, good_features_list, scores)
 
     X = pd.DataFrame(Xcopy, columns=good_features_list)
     return X
+
+# =============================================================================
+# 
+# =============================================================================
+
+# Main program
+def main():
+    # Importing dataset
+    X, y = import_dataset()
+
+    # Generating additional features using MAST-ML
+    # X,y = generate_features(X)
+
+    # Find and select optimal features
+    # X = FeatureSelectionPipeline().find_features(X, y)
+    X = find_features(X, y)
+    
+    # Splitting dataset into train and test sets
+    X_train, X_test, y_train, y_test = split_dataset(X, y)
+
+    # Train the model using the training sets
+    model = train_model(X_train, y_train, "RF")
+
+    # Predicting using trained model
+    y_pred = predict(model, X_test)
+
+    # Evaluating model performance
+    mae_score, rmse_score, r2_score_, r2adj_score = evaluate_model(y_test, y_pred)
+    print(mae_score, rmse_score, r2_score_, r2adj_score)
+    #metricsPrint(y_test, y_pred)
+
+    # Plotting actual vs predicted values
+    plot_results(y_test, y_pred)
+
+if __name__ == "__main__":
+    main()
+
