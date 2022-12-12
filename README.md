@@ -5,12 +5,30 @@ This repository contains the code and data for a machine learning project that p
 The repository contains the following files:
 
 BandGapPredict-Notebook.ipynb: A Jupyter notebook that contains the code and analysis for the project.
+main.py: This is the main script for the project. It contains the code for training and evaluating the machine learning model that predicts the band gap of a material from its chemical composition.
+requirements.txt: This file specifies the Python packages that are required for the project.
 data/: A directory that contains the input data for the project.
 figures/: A directory that contains the figures generated for the project.
 
-To run the code, clone the repository and install the required libraries. Then, open the Jupyter notebook and follow the instructions in the notebook.
+## Requirements
 
-The project uses the libraries such as numpy, pandas, sklearn and mast-ml for data processing and machine learning. The code is written in the python programming language.
+In order to run this project, you will need the following:
+
+- Python 3
+- pandas==1.1.1
+- numpy==1.19.1
+- matplotlib==3.3.2
+- scikit-learn==0.24.1
+
+## Usage
+
+To use this project, follow these steps:
+
+1. Clone the repository: `git clone https://github.com/aiostarex/Band-Gap-Prediction-Using-ML.git`
+2. Navigate to the project directory: `cd Band-Gap-Prediction-Using-ML`
+3. Install the required dependencies: `pip install -r requirements.txt`
+4. Run the project: `python main.py`
+
 
 For more details about the project, please refer to the Jupyter notebook and the Master's thesis, which can be found in https://tez.yok.gov.tr/UlusalTezMerkezi/ under title "Estimating the band gap of materials with machine learning methods".
 
