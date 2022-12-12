@@ -16,20 +16,23 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_square
 # from mastml.feature_generators import ElementalFeatureGenerator
 
 
-seed = 0
+seed = 12345123
+savepath = 'MASTML_FeaturesBandGap_04_28_03_56_03' 
+randomize=False
 
-def import_dataset(path='', hasGeneratedFeatures = False):
+def import_dataset(path=savepath, hasGeneratedFeatures = True):
     # Importing dataset
     if not hasGeneratedFeatures:
-        data = pd.read_csv("data/citrination-export.csv")
+        data = pd.read_csv(path + "/citrination-export.csv", index_col=0)
     
     if hasGeneratedFeatures:
-        data = pd.read_csv(path+'/AllData-Citrination-CDMM'+'.csv')
+        data = pd.read_csv(path + '/AllData-Citrination-CDMM'+'.csv', index_col=0)
     
     data = clean_dataset(data)
 
     X = data.drop(columns=["Chemical formula","Band gap"])
     y = data["Band gap"]
+    print('Import X:',X.shape[0], X.shape[1])
     return X, y
 
 def clean_dataset(data):
@@ -37,11 +40,11 @@ def clean_dataset(data):
     if not all(data["Chemical formula"].str.match(r"^[A-Za-z0-9]")):
         data['Chemical formula'] = data['Chemical formula'].str.replace('[$_{}]','') #Convert subscripts to normal
     
-    if not all(data["Band gap"].str.isalnum()):
+    if not all(data["Chemical formula"].str.match(r"^[0-9]")):
         data['Band gap'] = data['Band gap'].apply(pd.to_numeric, errors='coerce') ### Exclude rows that has ± sign
-    
+
     # Exclude materials with band gap = 0
-    data = data[data["Band gap"]>0] 
+    data = data[data["Band gap"]>0]
     data = data.dropna()
     
     #Clean from the same elements by averaging the band gap of same/reoccuring materials
@@ -62,11 +65,6 @@ def generate_features(X, y):
 
     return X, y
 
-def scale_dataset(X):
-    columns = X.columns
-    X = StandardScaler().fit_transform(X)
-    X = pd.DataFrame(X, columns=columns)
-    return X
 
 def split_dataset(X, y, evaluation_method='train_test_split', test_fraction=0.15, n_splits=5):
     """Split a dataset for evaluating a model.
@@ -101,7 +99,7 @@ def split_dataset(X, y, evaluation_method='train_test_split', test_fraction=0.15
         return cv.split(X, y)
     else:
         # Use train-test split
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_fraction)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_fraction, random_state=seed)
         return X_train, X_test, y_train, y_test
 
 def train_model(X_train, y_train, model_type):
@@ -113,7 +111,7 @@ def train_model(X_train, y_train, model_type):
         #SVC.fit(X_train, y_train)
     
     elif model_type == "Random Forest" or model_type == "RF":
-        regressor = RandomForestRegressor(n_estimators=100)
+        regressor = RandomForestRegressor(n_estimators=100, bootstrap=True, random_state=seed)
 
     else:
         raise ValueError(f"Invalid model type: {model_type}")
@@ -132,10 +130,16 @@ def evaluate_model(X, y_test, y_pred):
     mae_score = mean_absolute_error(y_test, y_pred)
     rmse_score = mean_squared_error(y_test, y_pred, squared=False)
     r2_score_ = r2_score(y_test, y_pred)
-    r2adj_score = 1 - (1 - r2_score_) * (X.shape[0] - 1) / (X.shape[0] - X.shape[1] - 1)
+    
+    # n is sample size
+    n = np.array(y_test).shape[0]
+    # p is number of features
+    p = len(X.columns)
+    r2adj_score = 1 - (((1-r2_score_)*(n-1))/(n-p-1))
+
     return mae_score, rmse_score, r2_score_, r2adj_score
     
-def metricsPrint(test_df, pred_df):
+def metricsPrint(test_df, pred_df, X_test):
     
     mae_score = mean_absolute_error(test_df, pred_df)
     mse_score = mean_squared_error(test_df, pred_df)
@@ -146,8 +150,9 @@ def metricsPrint(test_df, pred_df):
     msle_score = mean_squared_log_error(test_df, pred_df)
     mae_score = median_absolute_error(test_df, pred_df)
     r2_score_ = r2_score(test_df, pred_df)
-    r2_score_adj_ = (1 - (1-r2_score)*(len(test_df)-1)/(len(test_df)-len(test_df.columns)-1))
-    r2_fpe_score = ((len(test_df)+len(test_df.columns))*r2_score_adj_-len(test_df.columns))/(len(test_df)+1)
+    r2adj_score = 1 - (1 - r2_score_) * (X_test.shape[0] - 1) / (X_test.shape[0] - X_test.shape[1] - 1)
+    # r2_score_adj_ = (1 - (1-r2_score)*(len(test_df)-1)/(len(test_df)-len(test_df.columns)-1))
+    # r2_fpe_score = ((len(test_df)+len(test_df.columns))*r2_score_adj_-len(test_df.columns))/(len(test_df)+1)
     mpd_score = mean_poisson_deviance(test_df, pred_df)
     mgd_score = mean_gamma_deviance(test_df, pred_df)
     
@@ -159,8 +164,8 @@ def metricsPrint(test_df, pred_df):
 def plot_results(y_test, y_pred):
     # Plotting actual vs predicted values
     plt.scatter(y_test, y_pred)
-    plt.xlabel("Actual Band Gap")
-    plt.ylabel("Predicted Band Gap")
+    plt.xlabel("Actual Band Gap [eV]")
+    plt.ylabel("Predicted Band Gap [eV]")
     plt.title("Actual vs Predicted Band Gap")
     plt.show()
 
@@ -172,7 +177,7 @@ def plot_results(y_test, y_pred):
 def manageCorrelation(feat_data):
     # This block is used to find and to drop highly-correlated features in a given feature dataframe 
     corr_matrix = feat_data.corr(method='pearson').abs()
-    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
     to_drop = [column for column in upper.columns if any(upper[column] > 0.95)]
     features_df_filt_lowcorr = feat_data.drop(to_drop, axis=1) # drop highly-correlated features
     return features_df_filt_lowcorr
@@ -195,7 +200,7 @@ def pull_features(X, y, n_best_features=3):
     return initial_feature_list
 
 def update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores):
-    # Update the scores in the scores dictionary
+    # Update the scores stored in the scores dictionary
     scores['mae'].append(mae_score)
     scores['rmse'].append(rmse_score)
     scores['r2'].append(r2_score)
@@ -228,13 +233,9 @@ def test_feature(feature, good_features_list, scores):
     
     mae_score = scores['mae'][-1]
     rmse_score = scores['rmse'][-1]
-    r2_score = scores['r2'][-1]
+    r2_score_ = scores['r2'][-1]
     r2adj_score = scores['r2adj'][-1]
     
-    # mae_score = scores['mae'].pop()
-    # rmse_score = scores['rmse'].pop()
-    # r2_score = scores['r2'].pop()
-    # r2adj_score = scores['r2adj'].pop()
     
     # Check if the scores are the best results
     if scores['r2adj'][-1] < max(scores['r2adj']) or scores['r2'][-1] < max(scores['r2']) or scores['mae'][-1] > max(scores['mae']) or scores['rmse'][-1] > max(scores['rmse']):
@@ -244,16 +245,9 @@ def test_feature(feature, good_features_list, scores):
     
     # Check if the feature is in the list of good features
     if feature == good_features_list[-1]:
-        #print('New score: '+"%.3f"%scores['r2adj']+'/'+"%.3f"%scores['r2']+' :: - MAE: '+"%.3f"%scores['mae']+' - RMSE: '+"%.3f"%scores['rmse']+', Adding: '+good_features_list[-1])
-        #old version:
-        print('New score: '+"%.3f"%r2adj_score+'/'+"%.3f"%r2_score+' :: - MAE: '+"%.3f"%mae_score+' - RMSE: '+"%.3f"%rmse_score+', Adding: '+feature)
+        print('New score: '+"%.3f"%r2adj_score+'/'+"%.3f"%r2_score_+' :: - MAE: '+"%.3f"%mae_score+' - RMSE: '+"%.3f"%rmse_score+', Adding: '+feature)
       
-    # Update the scores in the dictionary
-    scores = update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores)
-    
     return good_features_list, scores
-
-randomize=True
 
 def find_features(X, y, good_features_list=[], n_best_features=3):
     scores = {
@@ -262,7 +256,7 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
       'r2': [],
       'r2adj': []
     }
-    print(type(scores))
+    
     
     Xcopy = X.copy()
     # when no feature list is specified, 
@@ -272,20 +266,20 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
     if(len(good_features_list)<1):
         good_features_list = pull_features(X, y, n_best_features=3)
 
-    X = pd.DataFrame(X, columns=good_features_list)
+    X_ = pd.DataFrame(Xcopy, columns=good_features_list)
     
-    X_train, X_test, y_train, y_test = split_dataset(X, y)
+    X_train, X_test, y_train, y_test = split_dataset(X_, y)
     
-    model = train_model(X, y, "RF")
+    model = train_model(X_train, y_train, "RF")
 
     y_pred = predict(model, X_test)
     
-    mae_score, rmse_score, r2_score, r2adj_score = evaluate_model(X_train, y_test, y_pred)
-    print(mae_score, rmse_score, r2_score, r2adj_score)
-
-    # Save scores in scores dictionary
-    scores = update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores)
-    print(scores)
+    mae_score, rmse_score, r2_score_, r2adj_score = evaluate_model(X_train, y_test, y_pred)
+    
+    # Save scores into scores dictionary
+    scores = update_scores(mae_score, rmse_score, r2_score_, r2adj_score, scores)
+    print("%.3f"%r2adj_score+'/'+"%.3f"%r2_score_+' :: - MAE: '+"%.3f"%mae_score+' - RMSE: '+"%.3f"%rmse_score)
+    
     
     ### Automation Part
     # Create a list of features to be tested in means of MAE, RMSE, R^2, ADJ-R^2
@@ -294,30 +288,34 @@ def find_features(X, y, good_features_list=[], n_best_features=3):
     
     # Shuffle/randomize features
     shuffled_features = shuffleList(features_2b_tried_list, randomize=randomize) 
-
+    i=0
     print('Finding features now.')
     for feature in shuffled_features:
-        print('Testing: '+feature)
-        good_features_list.append(feature) # Feature to be tested
-        X = pd.DataFrame(Xcopy, columns=good_features_list)
+        i=i+1
+        print(f"{i+1}/{len(shuffled_features)}", end="\r", flush=True)
+        good_features_list.append(feature) # Feature combination to be tested
+        
+        X_ = pd.DataFrame(Xcopy, columns=good_features_list)
         
         # Calculate and eliminate highly-correlated features
-        X = manageCorrelation(X)
+        X_ = manageCorrelation(X_)
         # Preprocess
-        X = scale_dataset(X)
+        X_ = scale_dataset(X_)
         
         # Split
-        X_train, X_test, y_train, y_test = split_dataset(X, y)
+        X_train, X_test, y_train, y_test = split_dataset(X_, y)
         
         # Train model
-        model = train_model(X_train, y_train, "RF")
+        sub_model = train_model(X_train, y_train, "RF")
         
         # Get prediction
-        y_pred = predict(model, X_test)
+        y_pred = predict(sub_model, X_test)
 
-        #scores = update_scores(mae_score, rmse_score, r2_score, r2adj_score, scores)
+        mae_score, rmse_score, r2_score_, r2adj_score = evaluate_model(X_, y_test, y_pred)
+        scores = update_scores(mae_score, rmse_score, r2_score_, r2adj_score, scores)
         good_features_list, scores = test_feature(feature, good_features_list, scores)
-
+        
+        
     X = pd.DataFrame(Xcopy, columns=good_features_list)
     return X
 
@@ -334,7 +332,6 @@ def main():
     # X,y = generate_features(X)
 
     # Find and select optimal features
-    # X = FeatureSelectionPipeline().find_features(X, y)
     X = find_features(X, y)
     
     # Splitting dataset into train and test sets
@@ -347,9 +344,8 @@ def main():
     y_pred = predict(model, X_test)
 
     # Evaluating model performance
-    mae_score, rmse_score, r2_score_, r2adj_score = evaluate_model(y_test, y_pred)
-    print(mae_score, rmse_score, r2_score_, r2adj_score)
-    #metricsPrint(y_test, y_pred)
+    mae_score, rmse_score, r2_score_, r2adj_score = evaluate_model(X, y_test, y_pred)
+    metricsPrint(y_test, y_pred, X_test)
 
     # Plotting actual vs predicted values
     plot_results(y_test, y_pred)
