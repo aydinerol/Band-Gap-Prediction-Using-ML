@@ -17,7 +17,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_square
 
 
 seed = 12345123
-savepath = 'MASTML_FeaturesBandGap_04_28_03_56_03' 
+savepath = './data' 
 randomize=False
 
 def import_dataset(path=savepath, hasGeneratedFeatures = True):
