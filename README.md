@@ -6,7 +6,7 @@ The repository contains the following files:
 
 - main.py: This is the main script for the project. It contains the code for training and evaluating the machine learning model that predicts the band gap of a material from its chemical composition.
 - BandGapPredict-Notebook.ipynb: A Jupyter notebook that contains the code and analysis for the project.
-- requirements.txt: This file specifies the Python packages that are required for the project.
+-requirements.txt: This file specifies the Python packages that are required for the project.
 - data/* : A directory that contains the input data
 - figures/* : A directory that contains the generated figures
 
@@ -30,6 +30,6 @@ To use this project, follow these steps:
 4. Run the project: `python main.py`
 
 
-For more details about the project, please refer to the Jupyter notebook and the Master's thesis, which can be found in https://tez.yok.gov.tr/UlusalTezMerkezi/ under title "Estimating the band gap of materials with machine learning methods".
+For more details about the project, please refer to the Jupyter notebook and the Master's thesis, which can be found in https://tez.yok.gov.tr/UlusalTezMerkezi/ under title "*Estimating the band gap of materials with machine learning methods*".
 
 Please feel free to contact the author for any questions or comments about the project.
