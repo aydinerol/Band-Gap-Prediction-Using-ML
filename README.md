@@ -4,15 +4,11 @@ This repository contains the code and data for a machine learning project that p
 
 The repository contains the following files:
 
-main.py: This is the main script for the project. It contains the code for training and evaluating the machine learning model that predicts the band gap of a material from its chemical composition.
-
-BandGapPredict-Notebook.ipynb: A Jupyter notebook that contains the code and analysis for the project.
-
-requirements.txt: This file specifies the Python packages that are required for the project.
-
-data/: A directory that contains the input data for the project.
-
-figures/: A directory that contains the figures generated for the project.
+- main.py: This is the main script for the project. It contains the code for training and evaluating the machine learning model that predicts the band gap of a material from its chemical composition.
+- BandGapPredict-Notebook.ipynb: A Jupyter notebook that contains the code and analysis for the project.
+- requirements.txt: This file specifies the Python packages that are required for the project.
+- data/* : A directory that contains the input data
+- figures/* : A directory that contains the generated figures
 
 ## Requirements
 
